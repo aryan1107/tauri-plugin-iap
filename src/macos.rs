@@ -59,6 +59,7 @@ mod ffi {
             productId: String,
             productType: String,
             offerToken: Option<String>,
+            appAccountToken: Option<String>,
         ) -> Result<String, FFIResult>;
         async fn restorePurchases(&self, productType: String) -> Result<String, FFIResult>;
         async fn acknowledgePurchase(&self, purchaseToken: String) -> Result<String, FFIResult>;
@@ -133,11 +134,17 @@ impl<R: Runtime> Iap<R> {
     pub async fn purchase(&self, payload: PurchaseRequest) -> crate::Result<Purchase> {
         validation::require_bundle()?;
 
+        let (offer_token, app_account_token) = payload
+            .options
+            .map(|opts| (opts.offer_token, opts.app_account_token))
+            .unwrap_or((None, None));
+
         self.plugin
             .purchase(
                 payload.product_id,
                 payload.product_type,
-                payload.options.and_then(|opts| opts.offer_token),
+                offer_token,
+                app_account_token,
             )
             .await
             .parse()

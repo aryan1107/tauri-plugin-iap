@@ -109,7 +109,7 @@ class IapPlugin {
         return try serializeToJSON(["products": productsArray])
     }
 
-    public func purchase(productId: RustString, productType: RustString, offerToken: RustString?)
+    public func purchase(productId: RustString, productType: RustString, offerToken: RustString?, appAccountToken: RustString?)
         async throws(FFIResult) -> String
     {
         let id = productId.as_str().toString()
@@ -126,10 +126,21 @@ class IapPlugin {
             throw FFIResult.Err(RustString("Product not found"))
         }
 
+        // Build purchase options (including appAccountToken for user tracking)
+        var purchaseOptions: Set<Product.PurchaseOption> = []
+        if let tokenString = appAccountToken?.as_str().toString(), !tokenString.isEmpty {
+            guard let uuid = UUID(uuidString: tokenString) else {
+                throw FFIResult.Err(RustString("Invalid appAccountToken: must be a valid UUID string"))
+            }
+            purchaseOptions.insert(.appAccountToken(uuid))
+        }
+
         // Initiate purchase
         let result: Product.PurchaseResult
         do {
-            result = try await product.purchase()
+            result = purchaseOptions.isEmpty
+                ? try await product.purchase()
+                : try await product.purchase(options: purchaseOptions)
         } catch {
             throw FFIResult.Err(RustString("Purchase failed: \(error.localizedDescription)"))
         }
